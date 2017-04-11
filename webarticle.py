@@ -78,7 +78,7 @@ class webarticle(object):
         txt, number = re.subn(re2, '', txt)
         txt, number = re.subn(re3, '', txt)
         txt, number = re.subn(re4, '', txt)
-        self.text = txt
+        self.text = txt.replace('\t', '').replace('&nbsp;', '').replace(' ', '')
     
     def get_web_article(self):
 
