@@ -52,15 +52,14 @@ re3 = re.compile(r'<style.*?>[\s\S]*?</style>')    # 比如js脚本或者js注�
 re4 = re.compile(r'<[\s\S]*?>')
 re_href = re.compile(r'<a.*?href=.*?>')
 
-text, number = re.subn(re_href, '*', text)
-text, number = re.subn(re1, '', text)
-text, number = re.subn(re2, '', text)
-text, number = re.subn(re3, '', text)
-text, number = re.subn(re4, '', text)
-text = text.replace('\t', '').replace('&nbsp;', '').replace(' ', '')
+text = re.sub(re_href, '*', text)
+text = re.sub(re1, '', text)
+text = re.sub(re2, '', text)
+text = re.sub(re3, '', text)
+text = re.sub(re4, '', text)
+text = text.replace('\t', '').replace('&nbsp;', '').replace(' ', '')  # 剔除出现的空格字符
 
-lines = text.split('\n')
-threshold = len(text) / len(lines)  # 设置字符阈值
+lines = text.split('\n')            # 正文分段
 article = []
 begin = end = 0                     # 正文开头行和结尾行
 for i, line in enumerate(lines):
@@ -72,9 +71,11 @@ if len(article) == 1:
 else:
     article.sort()
     begin = article[0]
-    end = article[-1]
+    end = article[-1]               # 认为超过120字的行之间肯定为正文
+                                    # begin：第一个超过120字行号
+                                    # end：  最后一个超过120字行号
 
-while True:
+while True:                         # begin和end之间肯定为正文，然后向begin之前和end之后找是否还有正文但是没超过120字
     if begin <= 2:
         break
     else:
@@ -113,7 +114,7 @@ while True:
 
 # 对已经获得的正文进行重新审核 部分广告和正文之间可能混在一起
 for k in range(begin, end+1):
-    text = lines[k].replace('&ldquo;', '“').replace('&rdquo;', '”')
+    text = lines[k].replace('&ldquo;', '“').replace('&rdquo;', '”')  # “ ” 这个符号无法被解码 需要替换
     if text.count('*') > 5:
         issues = text.split('*')
         text = ''
