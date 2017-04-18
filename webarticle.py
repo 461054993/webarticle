@@ -4,93 +4,78 @@ import re
 import chardet
 import numpy as np
 import matplotlib.pylab as plt
-from argparse import ArgumentParser
 import urllib
-from bs4 import BeautifulSoup
 import time
+from bs4 import BeautifulSoup
 
-parser = ArgumentParser()
-parser.add_argument('-k', '--keyword', help='输入搜索关键字，多个关键字以空格分割', type=str)
-parser.add_argument('-u', '--url', help='输入指定url，只限一个', type=str)
-parser.add_argument('-p', '--print', help='打印网页正文', action='store_true')
-parser.add_argument('-s', '--store', help='保存网页正文,可以添加路径和参数 -s \'/home/local/xxx test1\' 或者采用默认方式 -s \'\'', type=str)
-args = parser.parse_args()
 
 class webarticle(object):
 
-    def __init__(self):
-        if args.keyword:
-            
-            self.keyword = re.sub(r'\s+', ' ', args.keyword)
+    def __init__(self, url='', keyword='', num=1):
 
-            # 根据关键字从百度获取第一页的url
-            baidu_url = 'http://www.baidu.com/s?wd=' + urllib.parse.quote(self.keyword)
-            htmlpage = urllib.request.urlopen(baidu_url, timeout=5).read()
-            soup = BeautifulSoup(htmlpage, 'html.parser', from_encoding='utf-8')
-
-            content = soup.find('div', id='wrapper').find('div', id='wrapper_wrapper').find('div', id='container').\
-                find('div', id='content_left')
-            html_tags = content.find_all('div', class_='result c-container ')
-            htmls = []
-            for html_tag in html_tags:
-                new = html_tag.find('h3', class_='t')
-                htmls.append(str(new).split('}" href="')[1].split('" target="')[0])
-            urls = self.GetRealUrl(htmls)
-
-            # 目前只取第一个url
-            self.url = urls[0]
-
-        else:
-            self.url = args.url
+        self.url = url
+        self.keyword = keyword
+        self.keyword_url_num = num
 
         self.begin = self.end = 0  # 正文开头行和结尾行
-        self.encoder = self.get_url_chardet(self.url)
-        self.req = requests.get(self.url)
-        self.req.encoding = self.encoder
-        self.text = self.req.text
 
-        self.clean_text()
-        self.get_web_article()
-
-        if args.print:
-            print(self.text)
-        elif args.store:
-            string = re.sub('\s+', ' ', args.store)
-            if ' ' in string:
-                temp = string.split(' ')
-                self.store_article(temp[0], temp[1])
-            else:
-                print('store parameter error')
+        if url != '':
+            self.get_web_article()
+        elif keyword != '':
+            urls = self.get_url_from_net(self.keyword, num)
+            for url in urls:
+                self.url = url
+                self.get_web_article()
                 self.store_article()
-        else:
-            self.store_article()
 
     def clean_text(self):
         re1 = re.compile(r'<!--[\s\S]*?-->')  # .匹配除换行符外所有字符 有换行符出现 用\s\S
         re2 = re.compile(r'<script.*?>[\s\S]*?</script>')  # re1 re2 re3 用来剔除非html标签的噪音
         re3 = re.compile(r'<style.*?>[\s\S]*?</style>')  # 比如js脚本或者js注释
         re4 = re.compile(r'<[\s\S]*?>')
+        re5 = re.compile(r'http:.*?(jpg|png|jpeg|JPEG)')
         re_href = re.compile(r'<a.*?href=.*?>')
 
-        # 将所有herf链接替换为*
-        txt, number = re.subn(re_href, '*', self.text)
-        txt, number = re.subn(re1, '', txt)
-        txt, number = re.subn(re2, '', txt)
-        txt, number = re.subn(re3, '', txt)
-        txt, number = re.subn(re4, '', txt)
-        self.text = txt.replace('\t', '').replace('&nbsp;', '').replace(' ', '')
-    
-    def get_web_article(self):
+        txt = re.sub(re_href, '*', self.text)
+        txt1 = re.sub(re1, '', txt)
+        txt2 = re.sub(re2, '', txt1)
+        txt3 = re.sub(re3, '', txt2)
+        txt4 = re.sub(re4, '', txt3)
+        txt5 = re.sub(re5, '', txt4)
+        self.text = txt5.replace('\t', '').replace('&nbsp;', '').replace(' ', '')
+
+    def get_web_article(self, out_url=''):
+
+        if out_url != '':
+            self.url = out_url
+
+        self.encoder = self.get_url_chardet(self.url)
+        try:
+            self.req = requests.get(self.url)
+            self.req.encoding = self.encoder
+            self.text = self.req.text
+        except:
+            print('parser error, cannot get text, url:', self.url)
+            return
+
+        if '百度贴吧' in self.text or '发表于' in self.text or '百度经验' in self.text or '百度文库' in self.text or len(
+                self.text) < 1000:
+            print('web content error, cannot get article, url:', self.url)
+            return
+
+        self.clean_text()
 
         lines = self.text.split('\n')
         article = []
         for i, line in enumerate(lines):
-            if len(line) > 120:  # 如果一段超过120个字 直接认为肯定是正文，这样保证article里面肯定不会空
+            if len(line) > 120 and line.count('*') < 5:  # 如果一段超过120个字 直接认为肯定是正文，这样保证article里面肯定不会空
                 article.append(i)
 
         if len(article) == 0:
-            print('cannot get web article')
-            exit(0)
+            print('cannot get web article, url:', self.url)
+            self.text = ''
+            return
+
         elif len(article) == 1:
             self.begin = self.end = article[0]
         else:
@@ -134,21 +119,60 @@ class webarticle(object):
                     else:
                         self.end += 1
 
-        self.text = ''
         # 对已经获得的正文进行重新审核 部分广告和正文之间可能混在一起
+        self.text = ''
         for k in range(self.begin, self.end + 1):
             txt = lines[k].replace('&ldquo;', '“').replace('&rdquo;', '”')
-            if txt.count('*') > 5:
-                issues = txt.split('*')
-                for issue in issues:
-                    if len(issue) > 20:
-                        self.text += issue + '\n'
+            if txt.count('*') > 5 or len(txt) < 10:
+                if len(txt) < 10:
+                    pass
+                else:
+                    issues = txt.split('*')
+                    for issue in issues:
+                        if len(issue) > 20:
+                            self.text += issue + '\n'
             else:
                 self.text += txt.replace('*', '') + '\n'
 
+    def get_url_from_net(self, keyword='', num=1):
+
+        if self.keyword == '':
+            self.keyword = keyword
+
+        self.keyword = re.sub(r'\s+', ' ', self.keyword)
+
+        # 根据关键字从百度获取第一页的url
+        baidu_url = 'http://www.baidu.com/s?wd=' + urllib.parse.quote(self.keyword)
+        htmlpage = urllib.request.urlopen(baidu_url, timeout=5).read()
+        soup = BeautifulSoup(htmlpage, 'html.parser', from_encoding='utf-8')
+
+        content = soup.find('div', id='wrapper').find('div', id='wrapper_wrapper').find('div', id='container'). \
+            find('div', id='content_left')
+        html_tags = content.find_all('div', class_='result c-container ')
+        htmls = []
+        for html_tag in html_tags:
+            new = html_tag.find('h3', class_='t')
+            htmls.append(str(new).split('}" href="')[1].split('" target="')[0])
+        urls = self.GetRealUrl(htmls)
+        realurls = []
+        for url in urls:
+            try:
+                response = urllib.request.urlopen(url)
+                realurl = response.geturl()
+                requests.get(realurl, timeout=2)
+                realurls.append(realurl)
+            except:
+                pass
+
+        return realurls[0:num]
+
     def store_article(self, path='', name=''):
-        if path=='':
-            if name=='':
+        if len(self.text) < 200:
+            print('content is little, url:', self.url)
+            return
+
+        if path == '':
+            if name == '':
                 name = str(time.time()) + '.txt'
             else:
                 name += '.txt'
@@ -156,7 +180,7 @@ class webarticle(object):
                 f.write(self.text)
             f.close()
         else:
-            if name=='':
+            if name == '':
                 name = path + str(time.time()) + '.txt'
             else:
                 name = path + name + '.txt'
@@ -199,22 +223,7 @@ class webarticle(object):
                 else:
                     return False
 
-
-    @staticmethod
-    def show_lines(result):
-        lines = result.split('\n')
-        threshold = len(result) / len(lines)  # 设置字符阈值
-        line_num = len(lines)
-        line_length = []
-        for i in range(line_num):
-            line_length.append(len(lines[i]))
-
-        X = np.arange(line_num) + 1
-        Y = np.array(line_length)
-        plt.bar(X, Y, width=0.35)
-        L = [2 * threshold] * line_num
-        plt.plot(L, color="red", linewidth=0.5, linestyle="-")
-        plt.show()
-                
-w = webarticle()
-
+if __name__ == "__main__":
+    w = webarticle()
+    w.get_web_article('http://www.yjbys.com/gongwuyuan/show-506089.html')
+    print(w.text)
