@@ -4,6 +4,8 @@ import re
 import chardet
 import numpy as np
 import matplotlib.pylab as plt
+from bs4 import BeautifulSoup
+
 
 def show_lines(result):
     lines = result.split('\n')
@@ -33,7 +35,7 @@ def if_adv(line):
             else:
                 return False
 
-url = 'http://yjbys.com/gongzuozongjie/2013/1219977.html'
+url = 'http://auto.163.com/17/0417/07/CI77IISM000884MM.html'
 data = urlopen(url).read()
 # 获取源代码之后找到网页编码方式 再获取
 encoder = chardet.detect(data)
@@ -46,36 +48,40 @@ else:
 
 text = x.text
 
+title = BeautifulSoup(x.text, 'html.parser').find('head').find('title').get_text()
+print(title)
+
 re1 = re.compile(r'<!--[\s\S]*?-->')               # .匹配除换行符外所有字符 有换行符出现 用\s\S
 re2 = re.compile(r'<script.*?>[\s\S]*?</script>')  # re1 re2 re3 用来剔除非html标签的噪音
 re3 = re.compile(r'<style.*?>[\s\S]*?</style>')    # 比如js脚本或者js注释
 re4 = re.compile(r'<[\s\S]*?>')
+re5 = re.compile(r'http:.*?(jpg|png|jpeg|JPEG)')
 re_href = re.compile(r'<a.*?href=.*?>')
 
-text = re.sub(re_href, '*', text)
-text = re.sub(re1, '', text)
-text = re.sub(re2, '', text)
-text = re.sub(re3, '', text)
-text = re.sub(re4, '', text)
-text = text.replace('\t', '').replace('&nbsp;', '').replace(' ', '')  # 剔除出现的空格字符
+text, number = re.subn(re_href, '*', text)
+text, number = re.subn(re1, '', text)
+text, number = re.subn(re2, '', text)
+text, number = re.subn(re3, '', text)
+text, number = re.subn(re4, '', text)
+text, number = re.subn(re5, '', text)
+text = text.replace('\t', '').replace('&nbsp;', '').replace(' ', '')
 
-lines = text.split('\n')            # 正文分段
+lines = text.split('\n')
 article = []
 begin = end = 0                     # 正文开头行和结尾行
 for i, line in enumerate(lines):
-    if len(line) > 120:             # 如果一段超过120个字 直接认为肯定是正文，这样保证article里面肯定不会空
+    if len(line) > 120 and line.count('*') < 5:             # 如果一段超过120个字 直接认为肯定是正文，这样保证article里面肯定不会空
         article.append(i)
 
 if len(article) == 1:
     begin = end = article[0]
 else:
+    article = list(set(article))
     article.sort()
     begin = article[0]
-    end = article[-1]               # 认为超过120字的行之间肯定为正文
-                                    # begin：第一个超过120字行号
-                                    # end：  最后一个超过120字行号
+    end = article[-1]
 
-while True:                         # begin和end之间肯定为正文，然后向begin之前和end之后找是否还有正文但是没超过120字
+while True:
     if begin <= 2:
         break
     else:
@@ -114,15 +120,16 @@ while True:
 
 # 对已经获得的正文进行重新审核 部分广告和正文之间可能混在一起
 for k in range(begin, end+1):
-    text = lines[k].replace('&ldquo;', '“').replace('&rdquo;', '”')  # “ ” 这个符号无法被解码 需要替换
-    if text.count('*') > 5:
-        issues = text.split('*')
-        text = ''
-        for issue in issues:
-            if len(issue) > 20:
-                text += issue
-        print(text)
+    text = lines[k].replace('&ldquo;', '“').replace('&rdquo;', '”')
+    if text.count('*') > 5 or len(text) < 10:
+        if len(text) < 10:
+            pass
+        else:
+            issues = text.split('*')
+            text = ''
+            for issue in issues:
+                if len(issue) > 20:
+                    text += issue
+            print(text)
     else:
-        print(text.replace('*', ''))
-
-# show_lines(text)
+        print(text.replace('*', '').replace('\n', ''))
