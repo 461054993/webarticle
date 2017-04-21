@@ -261,3 +261,11 @@ class webarticle(object):
                     return True
                 else:
                     return False
+                
+                
+if __name__ == '__main__':
+    url = ''
+    w = webarticle()
+    dic = w.get_web_article(url)
+    print(dic['title'])
+    print(dic['text'])
