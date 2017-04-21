@@ -13,6 +13,9 @@
 
 觉得好用点下star，靴靴~
 
+---important
+
+many rules are made for Chinese, if your web is English check it
 
 A new web page text extraction algorithm code.
 very effective on the ads.
