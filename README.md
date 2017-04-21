@@ -8,3 +8,16 @@
 
 测试请参考 onlytest.py
 服务器运行参考 webarticle.py
+
+以后只维护webarticle.py文件
+
+觉得好用点下star，靴靴~
+
+
+A new web page text extraction algorithm code.
+very effective on the ads.
+base on Python3.
+
+details look the webarticle.py.
+
+give me a star, if u think useful. thx~~~
