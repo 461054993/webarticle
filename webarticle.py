@@ -27,7 +27,7 @@ class webarticle(object):
     def clean_text(self):
         re1 = re.compile(r'<!--[\s\S]*?-->')  # .匹配除换行符外所有字符 有换行符出现 用\s\S
         re2 = re.compile(r'<script.*?>[\s\S]*?</script>')  # re1 re2 re3 用来剔除非html标签的噪音
-        re3 = re.compile(r'<style.*?>[\s\S]*?</style>')  # 比如js脚本或者js注释
+        re3 = re.compile(r'<style.*?>[\s\S]*?</style>')    # 比如js脚本或者js注释
         re4 = re.compile(r'<[\s\S]*?>')
         re5 = re.compile(r'http:.*?(jpg|png|jpeg|JPEG)')
         re_href = re.compile(r'<a.*?href=.*?>')
@@ -73,10 +73,16 @@ class webarticle(object):
         for i, line in enumerate(lines):
 
             if len(line) > 120 and \
-                    len(re.findall(r'\W', line)) / len(line) < 0.2 and \
-                    len(re.findall(r'[a-zA-Z]', line)) / len(line) < 0.2:
+                    len(re.findall(r'\W', line)) / len(line) < 0.2:
+                # and len(re.findall(r'[a-zA-Z]', line)) / len(line) < 0.2:
 
-                # 如果一段超过120个字 直接认为肯定是正文，这样保证article里面肯定不会空
+                # 如果一段超过120个字 直接认为肯定是正文
+                # 而且不允许符号和英文超过文章内容的20%  一般网站有乱码或者什么的 这个正则都能排除
+                # 我注释掉的规则请看情况决定是否要加上
+                
+                # len(re.findall(r'[a-zA-Z]', line)) / len(line) < 0.2   is only useful for Chinese
+                # if your web is English, don't use
+                
                 article.append(i)
 
         begin = end = 0  # 正文开头行和结尾行
