@@ -13,7 +13,8 @@
 
 觉得好用点下star，靴靴~
 
----important
+-------
+important for English
 
 many rules are made for Chinese, if your web is English check it
 
